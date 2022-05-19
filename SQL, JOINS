@@ -1,0 +1,51 @@
+--Task #3.4 (added 19.05.2022)
+--У пользователя может быть два идентификатора – UserID и DeviceID. В таблице checks есть только UserID, в остальных – только DeviceID. Во вспомогательной таблице devices есть и UserID, и DeviceID. 
+--Давайте с помощью JOIN дополним таблицу events (left) данными о UserID пользователей из таблицы devices (right). Для некоторых DeviceID не будет пары UserID из таблицы devices – подумайте, какой вид JOIN подойдет, чтобы не потерять те строки, где DeviceID есть в events, но нет в devices.
+--Укажите UserID из первой строки результирующей таблицы, используя сортировку по убыванию по полю DeviceID.
+
+SELECT
+    l.AppPlatform as AppPlatform ,
+    l.events as events,
+    l.EventDate as EventDate,
+    l.DeviceID as DeviceID,
+    r.UserID as UserID
+FROM
+    events as l
+LEFT JOIN
+    devices as r
+ON
+    l.DeviceID = r.DeviceID
+
+ORDER BY
+    DeviceID DESC
+
+LIMIT 100
+
+--Task #3.5 (added 19.05.2022)
+--Давайте проверим, пользователи пришедшие из какого источника совершили наибольшее число покупок. В качестве ответа выберите название Source, юзеры которого совершили ---больше всего покупок.
+--Hint: Для этого используйте UserID, DeviceID и Source из соответствующих таблиц. Считать уникальные значения здесь не нужно.
+
+SELECT
+    Source,
+    COUNT() AS Quantity_Pur
+FROM
+    (
+    SELECT
+        a.UserID AS UserID,         --from Checks
+        b.DeviceID AS DeviceID,     --from devices
+        c.Source AS Source          --from installs
+    FROM checks AS a
+    LEFT JOIN devices AS b
+        ON a.UserID = b.UserID
+    LEFT JOIN installs AS c
+        ON b.DeviceID = c.DeviceID
+    )
+GROUP BY
+    Source
+ORDER BY
+    Quantity_Pur DESC
+LIMIT 100
+
+
+Changes log:
+19.05.2022 - added solutions of Task #3.4 and Task #3.5
