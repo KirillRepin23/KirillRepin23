@@ -1,0 +1,162 @@
+--Task #4.4 (added 27.05.2022)
+
+--На Airbnb есть две основные группы пользователей:
+--Хозяева (хосты, hosts) – сдают жилье
+--Путешественники (travelers) – снимают
+--Начнем с анализа характеристик хозяев в таблице listings! 
+--Пользователи, сдающие квартиры на Airbnb, зарегистрировались в разное время. Кто-то – очень давно, а кто-то совсем недавно. 
+--Давайте проверим, в какой месяц и год зарегистрировалось наибольшее количество новых хостов. В качестве ответа введите дату следующего формата: 2010-12
+--host_id – идентификатор хозяина
+--host_since – дата регистрации как хост
+--Note: Сам хост может встретиться в таблице несколько раз, если сдает несколько помещений, поэтому не забудьте оставить уникальные значения host_id. 
+--Также обратите внимание на тип данных в host_since, возможно вам пригодится toStartOfMonth() для извлечения части даты и toDateOrNull() для обработки пустых значений.
+
+SELECT 
+    toStartOfMonth(toDateOrNull(host_since)) AS start_date1,
+    COUNT(DISTINCT host_id) AS Quant
+FROM listings
+
+GROUP BY
+    start_date1
+ORDER BY
+    Quant ASC
+LIMIT 100
+
+
+--Task #4.5 (added 27.05.2022)
+
+Посмотрим на среднюю частоту ответа среди хозяев (f) и суперхозяев (t).
+
+--Значения частоты ответа хранятся как строки и включают значок %, который необходимо заменить на пустоту (''). 
+--После этого приведите столбец к нужному типу данных с помощью toInt32OrNull() и посчитайте среднюю частоту отклика в разбивке по тому, является ли хост суперхозяином
+--или нет. В качестве ответа укажите наибольшее среднее.
+--host_response_rate – частота ответа
+--host_is_superhost – является ли суперхозяином
+--Важный момент: у каждого host_id есть только одно уникальное значение частоты ответа, а также одна единая отметка суперхозяина. 
+--Чтобы посчитать показатели честно, нужно использовать подзапрос и взять уникальные комбинации с помощью DISTINCT.
+
+SELECT 
+    host_is_superhost,
+    AVG(toInt32OrNull(replaceAll(host_response_rate,'%',''))) AS avg_freq
+FROM 
+    (
+    SELECT
+        DISTINCT 
+            host_id,
+            host_is_superhost,
+            host_response_rate
+    FROM listings
+    ) AS sub
+WHERE 
+    host_is_superhost != ''
+GROUP BY
+    host_is_superhost
+LIMIT 10
+
+
+--Task #4.6 (added 27.05.2022)
+
+--Сгруппируйте данные из listings по хозяевам (host_id) и посчитайте, какую цену за ночь в среднем каждый из них устанавливает (у одного хоста может быть несколько
+--объявлений). Идентификаторы сдаваемого жилья объедините в отдельный массив. Таблицу отсортируйте по убыванию средней цены и убыванию host_id (в таком порядке). 
+--В качестве ответа укажите первый массив в результирующей таблице, состоящий более чем из двух id. Например: 2343477,6340,32324
+--host_id – идентификатор хозяина
+--id – идентификатор жилья
+--price – цена за ночь в конкретном месте
+
+-- Converting String (with different signs to Float) using replaceRegexpAll  
+
+SELECT
+    host_id as host_id,
+    AVG(toFloat32OrNull(replaceRegexpAll(price,'[$,]',''))) AS avg_price,
+    groupArray(id)
+FROM listings
+GROUP BY
+    host_id
+ORDER BY
+    avg_price DESC,
+    host_id DESC
+LIMIT 10
+
+
+--Task #4.7 (added 27.05.2022)
+
+--Немного усложним предыдущую задачу, и посчитаем разницу между максимальной и минимальной установленной ценой у каждого хозяина. 
+--В качестве ответа укажите идентификатор хоста, у которого разница оказалась наибольшей. 
+--host_id – идентификатор хозяина
+--id – идентификатор жилья
+--price – цена за ночь в конкретном месте
+
+SELECT
+    host_id as host_id,
+    MAX(toFloat32OrNull(replaceRegexpAll(price,'[$,]',''))) - MIN(toFloat32OrNull(replaceRegexpAll(price,'[$,]',''))) AS delta_price
+FROM listings
+GROUP BY
+    host_id
+ORDER BY
+    delta_price DESC
+LIMIT 10
+
+
+--Task #4.8 (added 27.05.2022)
+
+--Теперь сгруппируйте данные по типу жилья и выведите средние значения цены за ночь, размера депозита и цены уборки. 
+--Обратите внимание на тип данных, наличие значка $ и запятых в больших суммах. Для какого типа жилья среднее значение залога наибольшее?
+--room_type – тип сдаваемого жилья 
+--price – цена за ночь
+--security_deposit – залог за сохранность имущества
+--cleaning_fee – плата за уборку
+
+SELECT
+    room_type as room_type,
+    AVG(toFloat32OrNull(replaceRegexpAll(price,'[$,]',''))) AS avg_price,
+    AVG(toFloat32OrNull(replaceRegexpAll(security_deposit,'[$,]',''))) AS avg_security_deposit,
+    AVG(toFloat32OrNull(replaceRegexpAll(cleaning_fee,'[$,]',''))) AS avg_cleaning_fee
+FROM listings
+GROUP BY
+    room_type
+ORDER BY
+    avg_security_deposit DESC
+LIMIT 10
+
+
+--Task #4.10 (added 27.05.2022)
+
+--В каких районах Берлина средняя площадь жилья, которое сдаётся целиком, является наибольшей? Отсортируйте по среднему и выберите топ-3. 
+
+SELECT
+    neighbourhood_cleansed as neighbourhood_cleansed,
+    AVG(toFloat32OrNull(square_feet)) AS avg_square_feet
+FROM listings
+WHERE 
+    room_type = 'Entire home/apt'
+GROUP BY
+    neighbourhood_cleansed
+ORDER BY
+    avg_square_feet DESC
+LIMIT 10
+
+
+--Task #4.11 (added 27.05.2022)
+
+--Напоследок давайте посмотрим, какая из представленных комнат расположена ближе всего к центру города. В качестве ответа укажите id объявления.
+--id – идентификатор жилья (объявления)
+--room_type – тип жилья ('Private room')
+--latitude – широта
+--longitude – долгота
+--52.5200 с.ш., 13.4050 в.д – координаты центра Берлина
+
+SELECT
+    id as id,
+    MIN(geoDistance(13.4050, 52.5200, toFloat64OrNull(longitude), toFloat64OrNull(latitude))) AS closest_downtown_room
+FROM 
+    listings
+WHERE
+    room_type = 'Private room'
+GROUP BY
+    id
+ORDER BY
+    closest_downtown_room ASC
+LIMIT 10
+
+Changes log:
+27.05.2022 - added solutions of Task #4.4, #4.5, #4.6, #4.7, #4.8, #4.10, #4.11
