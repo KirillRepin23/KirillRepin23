@@ -1,4 +1,5 @@
 --Task #3.4 (added 19.05.2022)
+
 --У пользователя может быть два идентификатора – UserID и DeviceID. В таблице checks есть только UserID, в остальных – только DeviceID. Во вспомогательной таблице devices есть и UserID, и DeviceID. 
 --Давайте с помощью JOIN дополним таблицу events (left) данными о UserID пользователей из таблицы devices (right). Для некоторых DeviceID не будет пары UserID из таблицы devices – подумайте, какой вид JOIN подойдет, чтобы не потерять те строки, где DeviceID есть в events, но нет в devices.
 --Укажите UserID из первой строки результирующей таблицы, используя сортировку по убыванию по полю DeviceID.
@@ -21,7 +22,9 @@ ORDER BY
 
 LIMIT 100
 
+
 --Task #3.5 (added 19.05.2022)
+
 --Давайте проверим, пользователи пришедшие из какого источника совершили наибольшее число покупок. В качестве ответа выберите название Source, юзеры которого совершили ---больше всего покупок.
 --Hint: Для этого используйте UserID, DeviceID и Source из соответствующих таблиц. Считать уникальные значения здесь не нужно.
 
@@ -47,5 +50,138 @@ ORDER BY
 LIMIT 100
 
 
+--Task #3.6 (added 27.05.2022)
+
+--Теперь выясним, сколько всего уникальных юзеров что-то купили в нашем приложении.
+--Объедините нужные таблицы, посчитайте число уникальных UserID для каждого источника (Source), и в качестве ответа укажите число пользователей, пришедших из Source_7.
+--Hint: checks – покупки, devices – соответствие, installs – информация об источнике.
+
+SELECT
+    Source,
+    uniqExact(UserID) AS Uniq_UserID
+FROM
+    (
+    SELECT
+        a.UserID AS UserID,     --from Checks
+        b.DeviceID AS DeviceID,     --from devices
+        c.Source AS Source --from installs
+    FROM checks AS a
+    LEFT JOIN devices AS b
+        ON a.UserID = b.UserID
+    LEFT JOIN installs AS c
+        ON b.DeviceID = c.DeviceID
+    )
+WHERE
+    Source = 'Source_7'
+GROUP BY
+    Source
+LIMIT 100
+
+
+--Task #3.7 (added 27.05.2022)
+
+--Самое время посмотреть на общую выручку, а также минимальный, максимальный и средний чек. Рассчитайте нужные показатели и соотнесите полученные значения.
+--Общая сумма денег, полученная от пользователей Source_1                 74
+--Максимальный чек пользователей из Source_14                             38189
+--Средний чек пользователей Source_21                                     5.5555556
+--Максимальная сумма заказа среди пользователей из Source_10              10
+--Общая выручка для Source_13                                             2752
+
+SELECT
+    Source,
+    SUM(Rub) AS revenue,
+    AVG(Rub) AS avg_check,
+    MIN(Rub) AS min_check,
+    MAX(Rub) AS max_check
+FROM
+    (
+    SELECT
+        a.UserID AS UserID,     --from Checks
+        a.Rub as Rub,            --from Checks
+        b.DeviceID AS DeviceID,     --from devices
+        c.Source AS Source --from installs
+    FROM checks AS a
+    LEFT JOIN devices AS b
+        ON a.UserID = b.UserID
+    LEFT JOIN installs AS c
+        ON b.DeviceID = c.DeviceID
+    )
+GROUP BY
+    Source
+LIMIT 100
+
+
+--Task #3.9 (added 27.05.2022)
+
+--Проверим, сколько товаров (events) в среднем просматривают пользователи с разных платформ (Platform), и пришедшие из разных источников  (Source). 
+--Для этого объедините таблицы events и installs, и посчитайте, сколько просмотров в среднем приходится на каждую пару платформа-канал привлечения.
+--Отсортируйте полученную табличку по убыванию среднего числа просмотров. 
+--В качестве ответа укажите платформу и источник, пользователи которого в среднем просматривали товары бóльшее число раз.
+
+SELECT
+    r.Platform AS Platform,
+    r.Source AS Source,
+    AVG(l.events) AS avg_events
+FROM events AS l
+LEFT JOIN installs AS r 
+ON r.DeviceID = l.DeviceID
+GROUP BY
+    Source,
+    Platform
+ORDER BY
+    avg_events DESC
+LIMIT 100
+
+
+--Task #3.10 (added 27.05.2022)
+
+--Давайте посчитаем число уникальных DeviceID в инсталлах, для которых присутствуют просмотры в таблице events с разбивкой по платформам (поле Platform). 
+--Для этого можно отобрать все строки только из таблицы installs, для которых нашлось соответствие в таблице events. 
+--В качестве ответа введите число инсталлов, для которых нашлись просмотры, на платформе android.
+
+SELECT
+    uniqExact(l.DeviceID) AS DeviceID,
+    l.Platform AS Platform
+FROM installs AS l
+LEFT SEMI JOIN events AS r
+ON l.DeviceID = r.DeviceID
+WHERE 
+        events > 0
+    AND
+        Platform = 'android'
+GROUP BY
+    Platform
+LIMIT 100
+
+
+--Task #3.11 (added 27.05.2022)
+
+Давайте теперь посчитаем конверсию из инсталла в просмотр с разбивкой по платформе инсталла – в данном случае это доля DeviceID, для которых есть просмотры, от всех DeviceID в инсталлах. 
+Для этого нужно объединить таблицы installs и events так, чтобы получить все DeviceID инсталлов и соответствующие им DeviceID из events, посчитать число уникальных DeviceID инсталлов (1) и соответствующих DeviceID из events (2) и вычислить долю (2) от (1). 
+В качестве ответа укажите значение конверсии из инсталла в просмотр на платформе ios. 
+Внимание: ответ указать не в процентах, а именно в виде доли (т.е. не нужно домножать полученный ответ на 100). 
+
+SELECT
+    (
+    SELECT
+        uniqExact(l.DeviceID) AS DeviceID
+    FROM installs AS l
+    LEFT SEMI JOIN events AS r
+    ON l.DeviceID = r.DeviceID
+    WHERE
+        Platform = 'iOS' 
+    )
+/
+    (
+    SELECT 
+        uniqExact(DeviceID) AS DeviceID
+    FROM installs
+    WHERE
+        Platform = 'iOS' 
+    ) AS conversion    
+LIMIT 10
+
+
 Changes log:
 19.05.2022 - added solutions of Task #3.4 and Task #3.5
+27.05.2022 - added solutions of Task #3.6, #3.7, #3.9, #3.10, #3.11
