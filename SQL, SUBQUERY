@@ -1,0 +1,254 @@
+--Task #5.1.4 (added 27.05.2022)
+
+--Оставьте только те объявления, в которых оценка на основе отзывов выше среднего, а число отзывов в месяц составляет строго меньше трёх. 
+--Затем отсортируйте по убыванию две колонки: сначала по числу отзывов в месяц, потом по оценке. В качестве ответа укажите id объявления из первой строки.
+--review_scores_rating – оценка на основе отзывов
+--reviews_per_month – число отзывов в месяц
+--id – идентификатор объявления
+--Таблица – listings. Наивысшие показатели = сортировка по убыванию.
+
+SELECT
+    id AS id,
+    toFloat32OrNull(review_scores_rating) AS review_scores_rating,
+    reviews_per_month AS reviews_per_month
+FROM listings
+WHERE
+        review_scores_rating > (SELECT AVG(toFloat32OrNull(review_scores_rating)) FROM listings)
+    AND
+        reviews_per_month < 3
+ORDER BY
+    reviews_per_month DESC,
+    review_scores_rating DESC 
+LIMIT 10
+
+
+--Task #5.1.5 (added 27.05.2022)
+
+--Посчитайте среднее расстояние до центра города и выведите идентификаторы объявлений о сдаче отдельных комнат, для которых расстояние оказалось меньше среднего. 
+--Результат отсортируйте по убыванию, тем самым выбрав комнату, которая является наиболее удаленной от центра, но при этом расположена ближе, чем остальные комнаты 
+--в среднем. 
+--id – идентификатор объявления
+--host_id – идентификатор хозяина
+--room_type – тип жилья ('Private room')
+--latitude – широта
+--longitude – долгота
+--52.5200 с.ш., 13.4050 в.д – координаты центра Берлина
+--В качестве ответа укажите идентификатор хозяина (host_id), сдающего данную комнату.
+
+WITH
+    (
+    SELECT 
+    AVG(geoDistance(13.4050, 52.5200, toFloat64OrNull(longitude), toFloat64OrNull(latitude))) 
+    FROM listings 
+    WHERE room_type = 'Private room'
+    ) AS avg_distance
+SELECT
+    host_id  as host_id,
+    geoDistance(13.4050, 52.5200, toFloat64OrNull(longitude), toFloat64OrNull(latitude)) AS distance_to_downtown,
+    avg_distance
+FROM 
+    listings
+WHERE
+        room_type = 'Private room'
+    AND
+        distance_to_downtown < avg_distance
+ORDER BY
+    distance_to_downtown DESC
+LIMIT 10
+
+
+--Task #5.1.6 (added 27.05.2022)
+
+--Представим, что вы планируете снять жилье в Берлине на 7 дней, используя более хитрые фильтры, чем предлагаются на сайте.
+--В этой задаче можно потренироваться в написании подзапросов, но задание можно решить и без них.
+--Отберите объявления из таблицы listings, которые:
+--находятся на расстоянии от центра меньше среднего (здесь нам пригодится запрос из предыдущего задания)
+--обойдутся дешевле 100$ в день (price с учетом cleaning_fee, который добавляется к общей сумме за неделю, т.е его нужно делить на кол-во дней)
+--имеют последние отзывы (last_review), начиная с 1 сентября 2018 года
+--имеют WiFi в списке удобств (amenities)
+--Отсортируйте полученные значения по убыванию review_scores_rating (не забудьте перевести строку к численному виду) и в качестве ответа укажите host_id из первой
+--строки.
+
+-- Here you can find searching Substring inside String
+-- Also works: multiSearchAnyCaseInsensitive(колонка, ['искомая_подстрока'] > 0)
+
+WITH
+    (
+    SELECT 
+    AVG(geoDistance(13.4050, 52.5200, toFloat64OrNull(longitude), toFloat64OrNull(latitude))) 
+    FROM listings 
+    ) AS avg_distance
+SELECT
+    host_id  as host_id,
+    toFloat32OrNull(review_scores_rating) AS review_scores_rating,
+    geoDistance(13.4050, 52.5200, toFloat64OrNull(longitude), toFloat64OrNull(latitude)) AS distance_to_downtown,
+    toFloat32OrNull(replaceRegexpAll(price,'[$,]','')) + toFloat32OrNull(replaceRegexpAll(cleaning_fee ,'[$,]',''))/7 AS total_price_per_day,
+    amenities,
+    last_review
+FROM listings
+WHERE
+        distance_to_downtown < avg_distance
+    AND
+        total_price_per_day < 100
+    AND
+        toDateOrNull(last_review) - toDate('2018-09-01') > 0
+    AND
+        amenities LIKE '%Wifi%'   -- Also works: multiSearchAnyCaseInsensitive(колонка, ['искомая_подстрока'] > 0)
+ORDER BY
+    review_scores_rating DESC
+LIMIT 20
+
+--Task #5.1.7 (added 27.05.2022)
+
+--Давайте найдем в таблице calendar_summary те доступные (available='t') объявления, у которых число отзывов от уникальных пользователей в таблице reviews выше
+--среднего.Для этого с помощью конструкции WITH посчитайте среднее число уникальных reviewer_id из таблицы reviews на каждое жильё, потом проведите джойн таблиц
+--calendar_summary и reviews по полю listing_id (при этом из таблицы calendar_summary должны быть отобраны уникальные listing_id, отфильтрованные по правилу -
+--available='t'). Результат отфильтруйте так, чтобы остались только записи, у которых число отзывов от уникальных людей выше среднего.
+--Отсортируйте результат по возрастанию listing_id и в качестве ответа впишите количество отзывов от уникальных пользователей из первой строки.
+
+WITH
+    (
+    SELECT
+    AVG (uniq_reviews)
+    FROM    (SELECT
+                 listing_id AS  listing_id,
+                 COUNT(DISTINCT reviewer_id) AS uniq_reviews
+            FROM reviews
+            GROUP BY
+            listing_id) 
+    ) AS avg_uniq_reviews
+SELECT
+    DISTINCT l.listing_id AS listing_id,
+    COUNT(DISTINCT r.reviewer_id) AS uniq_reviews
+FROM calendar_summary AS l
+LEFT JOIN reviews AS r
+ON  l.listing_id = r.listing_id 
+WHERE
+    available ='t'
+GROUP BY    
+    listing_id
+HAVING
+    uniq_reviews > avg_uniq_reviews
+ORDER BY
+    listing_id ASC
+LIMIT 10
+
+
+--Task #5.1.10 (added 27.05.2022)
+
+--Используйте таблицу checks и разделите всех покупателей на сегменты:
+--Правые границы берутся не включительно, например, чек в 10 рублей будет относиться к сегменту С
+--А — средний чек покупателя менее 5 ₽
+--B — средний чек покупателя от 5-10 ₽
+--C — средний чек покупателя от 10-20 ₽
+--D — средний чек покупателя от 20 ₽
+--Отсортируйте результирующую таблицу по возрастанию UserID и укажите сегмент четвертого пользователя.
+
+-- Conditions under CASE could be used without brackets
+
+SELECT  
+    UserID,
+    AVG(Rub),
+    CASE
+        WHEN AVG(Rub) < 5 THEN  'СЧ покупателя менее 5 ₽'
+        WHEN AVG(Rub) >= 5 AND AVG(Rub < 10) THEN  'СЧ покупателя от 5-10 ₽'
+        WHEN AVG(Rub) >= 10 AND AVG(Rub) < 20 THEN  'СЧ покупателя от 10-20 ₽'
+        ELSE  'СЧ покупателя от 20 ₽'
+    END AS category
+FROM
+    checks        
+GROUP BY
+    UserID
+ORDER BY
+    UserID
+LIMIT 50
+
+
+--Task #5.1.11 (added 27.05.2022)
+
+--Используйте предыдущий запрос как подзапрос и посчитайте, сколько клиентов приходится на каждый сегмент и сколько доходов он приносит. 
+--Отсортируйте результат по убыванию суммы доходов на сегмент и в качестве ответа укажите наибольшую сумму.
+
+SELECT
+    category,
+    COUNT() AS clients_per_category,
+    SUM(revenue_per_client) AS revenue_per_category
+FROM 
+    (
+    SELECT  
+        UserID,
+        SUM(Rub) AS revenue_per_client,
+        CASE
+            WHEN AVG(Rub) < 5 THEN  'СЧ покупателя менее 5 ₽'
+            WHEN AVG(Rub) >= 5 AND AVG(Rub) < 10 THEN  'СЧ покупателя от 5-10 ₽'
+            WHEN AVG(Rub) >= 10 AND AVG(Rub) < 20 THEN  'СЧ покупателя от 10-20 ₽'
+            ELSE  'СЧ покупателя от 20 ₽'
+            END AS category
+    FROM
+        checks        
+    GROUP BY
+        UserID
+    )
+GROUP BY
+    category
+ORDER BY
+    revenue_per_category DESC
+
+
+--Task #5.1.12 (added 27.05.2022)
+
+--Вернемся к таблице AirBnb. Предположим, что в выборе жилья нас интересует только два параметра: наличие кухни (kitchen) и гибкой системы отмены (flexible), 
+--причем первый в приоритете.
+--Создайте с помощью оператора CASE колонку с обозначением группы, в которую попадает жилье из таблицы listings:
+--'good', если в удобствах (amenities) присутствует кухня и система отмены (cancellation_policy) гибкая
+--'ok', если в удобствах есть кухня, но система отмены не гибкая
+--'not ok' во всех остальных случаях
+--Результат отсортируйте по новой колонке по возрастанию, установите ограничение в 5 строк, в качестве ответа укажите host_id первой строки.
+--Обратите внимание, что cancellation_policy - это отдельная колонка, по ней необходимо смотреть систему отмены
+
+SELECT  
+    host_id,
+    CASE
+        WHEN cancellation_policy = 'flexible' AND  multiSearchAnyCaseInsensitive(amenities, ['kitchen']) THEN  'good'
+        WHEN cancellation_policy != 'flexible' AND  multiSearchAnyCaseInsensitive(amenities, ['kitchen']) THEN  'ok'
+        ELSE  'not ok'
+    END AS category,
+    cancellation_policy,
+    amenities
+FROM
+    listings        
+ORDER BY
+    category ASC
+LIMIT 5
+
+
+--Task #5.2.2 (added 27.05.2022)
+
+--Напишите запрос для создания таблицы со следующими параметрами, также подобрав подходящий тип данных.
+--Название таблицы: reviews
+--База данных: test
+--Столбцы:
+--- listing_id – идентификатор объявления, может быть только положительным и целым числом, 32-битный тип данных
+--- id – идентификатор хозяина, может быть только положительным и целым числом, 32-битный тип данных
+--- date – дата со временем (2020-01-01 00:00:00), часовой пояс – 'Europe/Moscow'
+--- reviewer_id – идентификатор ревьюера, может быть только положительным и целым числом, 32-битный тип данных
+--- reviewer_name – имя того, кто оставил отзыв
+--- comments - текст отзыва
+--Движок: MergeTree
+--Сортировка: listing_id, id
+
+CREATE TABLE test.reviews (
+    listing_id UInt32,
+    id UInt32,
+    date DateTime('Europe/Moscow'),
+    reviewer_id UInt32,
+    reviewer_name String,
+    comments String
+)
+ENGINE = MergeTree
+ORDER BY (listing_id, id)
+
+
+Changes log:
+27.05.2022 - added solutions of Tasks #5.1.4, #5.1.5, #5.1.6, #5.1.7, #5.1.10, #5.1.11, #5.1.12, #5.2.2
+
