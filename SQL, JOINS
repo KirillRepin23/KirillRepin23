@@ -16,10 +16,8 @@ LEFT JOIN
     devices as r
 ON
     l.DeviceID = r.DeviceID
-
 ORDER BY
     DeviceID DESC
-
 LIMIT 100
 
 
@@ -184,4 +182,4 @@ LIMIT 10
 
 Changes log:
 19.05.2022 - added solutions of Task #3.4 and Task #3.5
-27.05.2022 - added solutions of Task #3.6, #3.7, #3.9, #3.10, #3.11
+27.05.2022 - added solutions of Tasks #3.6, #3.7, #3.9, #3.10, #3.11
