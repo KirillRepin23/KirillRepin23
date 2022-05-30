@@ -1,0 +1,52 @@
+-- С помощью открытого набора данных baseball выведи имя и фамилию питчера обладающего самой высокой скоростью броска для каждой команды за все сезоны. 
+-- Открытый набор данных можно найти в открытых датасетах для BigQuery: https://console.cloud.google.com/bigquery?p=bigquery-public-data&d=baseball. 
+-- Чтобы работать в интерфейсе BigQuery, в Enter project name добавь bigquery-public-data.
+-- В качестве ответа на данный вопрос необходимо предоставить SQL запрос, который выводит необходимые данные, а также сами эти данные, отсортированные по названию
+--команды в порядке возрастания.
+
+РЕШЕНИЕ:
+
+-- 4.Выбираем выводимые поля: фамилия и имя питчера, команда, максимальная скорость подачи (для каждой команды)
+SELECT
+  pitcher_full_name
+  , team
+  , team_max_pitch_speed
+FROM
+  --3.Используя оконную функцию, фиксируем самую быструю подачу для каждой команды
+  (
+  SELECT
+    pitcher_full_name
+    , team
+    , pitchSpeed
+    , max(pitchSpeed) over (PARTITION BY team) team_max_pitch_speed
+  FROM
+    --2. Формируем таблицу "питчер - команда - скорость подачи" для всех сезонов
+    (
+    SELECT DISTINCT
+      --2.1 Определяем полное имя питчера
+      CONCAT(pitcherFirstName, ' ', pitcherLastName) AS pitcher_full_name
+      --2.2 Определяем команду питчера
+      , CASE WHEN pitcherId IN (awayFielder1, awayFielder2, awayFielder3, awayFielder4, awayFielder5, awayFielder6
+                              ,awayFielder7, awayFielder8, awayFielder9, awayFielder10, awayFielder11, awayFielder12) THEN awayTeamName
+            WHEN pitcherId IN (homeFielder1, homeFielder2, homeFielder3, homeFielder4, homeFielder5, homeFielder6
+                              ,homeFielder7, homeFielder8, homeFielder9, homeFielder10, homeFielder11, homeFielder12) THEN homeTeamName
+            ELSE NULL
+        END AS team
+      , pitchSpeed
+    FROM 
+      --1. Объединяем сезоны в одну таблицу (регулярный и предсезонку), фильтруя по событию "PITCH"
+      (      
+      SELECT *
+      FROM bigquery-public-data.baseball.games_wide
+      UNION ALL
+      SELECT *
+      FROM bigquery-public-data.baseball.games_post_wide
+      ) all_games
+    WHERE atBatEventType = 'PITCH'
+    )
+  )
+--5. Фильтруем по максимальной скорости подачи и убираем строку, где не удалось определить команду (team = NULL)
+WHERE pitchSpeed = team_max_pitch_speed
+      AND team IS NOT NULL
+--6. Сортируем команды по возрастанию
+ORDER BY team ASC
