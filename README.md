@@ -1,6 +1,6 @@
 - 👋 Hi, I’m @KirillRepin23
 - 👀 I’m interested in data analytics, AI, history, strategy gaming
-- 🌱 I will share with my project and work experience here.
+- 🌱 I will share with my projects and work experience here.
 - 📫 repinkirill109209@yandex.ru
 
 <!---
