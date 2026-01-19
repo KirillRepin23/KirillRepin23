@@ -1,2 +1,2 @@
-- 👋 Hi, I’m @KirillRepin23
+👋 Hi, I’m @KirillRepin23
 
